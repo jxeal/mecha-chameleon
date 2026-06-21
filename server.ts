@@ -16,6 +16,7 @@ export interface PlayerState {
   position: { x: number, y: number, z: number };
   rotation: { x: number, y: number, z: number, w: number };
   role: "hunter" | "player";
+  brushColor?: string;
 }
 
 export interface RoomState {
@@ -204,11 +205,27 @@ async function startServer() {
       if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
         rooms[roomId].players[socket.id].position = data.position;
         rooms[roomId].players[socket.id].rotation = data.rotation;
+        if (data.brushColor !== undefined) {
+          rooms[roomId].players[socket.id].brushColor = data.brushColor;
+        }
         
         socket.volatile.to(roomId).emit("player:moved", {
           id: socket.id,
           position: data.position,
           rotation: data.rotation,
+          brushColor: data.brushColor
+        });
+      }
+    });
+
+    socket.on("player:paint", (data) => {
+      const roomId = socketRoomMap[socket.id];
+      if (roomId && rooms[roomId]) {
+        socket.to(roomId).emit("player:painted", {
+          id: socket.id,
+          u: data.u,
+          v: data.v,
+          color: data.color
         });
       }
     });

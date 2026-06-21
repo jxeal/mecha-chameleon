@@ -14,6 +14,7 @@ export interface RemotePlayer {
   position: { x: number, y: number, z: number };
   rotation: { x: number, y: number, z: number, w: number };
   role: "hunter" | "player";
+  brushColor?: string;
 }
 
 interface GameState {
@@ -40,7 +41,7 @@ interface GameState {
 
   addMark: (mark: Omit<BulletMark, 'timestamp' | 'id'>) => void;
   removeMark: (id: string) => void;
-  updateMyPosition: (pos: THREE.Vector3, rot: THREE.Quaternion) => void;
+  updateMyPosition: (pos: THREE.Vector3, rot: THREE.Quaternion, brushColor?: string) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -115,7 +116,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       set((state) => {
         const next = { ...state.players };
         if (next[data.id]) {
-          next[data.id] = { ...next[data.id], position: data.position, rotation: data.rotation };
+          next[data.id] = { 
+            ...next[data.id], 
+            position: data.position, 
+            rotation: data.rotation,
+            brushColor: data.brushColor ?? next[data.id].brushColor
+          };
         }
         return { players: next };
       });
@@ -139,6 +145,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (state.marks.find(existing => existing.id === mark.id)) return state;
         return { marks: [...state.marks, mark] };
       });
+    });
+
+    socket.on("player:painted", ({ id, u, v, color }) => {
+      window.dispatchEvent(new CustomEvent(`player-paint-${id}`, { detail: { u, v, color } }));
     });
 
     set({ socket });
@@ -188,13 +198,29 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   removeMark: (id) => set((state) => ({ marks: state.marks.filter(m => m.id !== id) })),
   
-  updateMyPosition: (pos, rot) => {
+  updateMyPosition: (pos, rot, brushColor) => {
     const socket = get().socket;
     if (socket && get().roomId) {
       socket.emit("player:move", {
         position: { x: pos.x, y: pos.y, z: pos.z },
         rotation: { x: rot.x, y: rot.y, z: rot.z, w: rot.w },
+        brushColor,
       });
+      const myId = get().myId;
+      if (myId) {
+        set((state) => {
+          const next = { ...state.players };
+          if (next[myId]) {
+            next[myId] = {
+              ...next[myId],
+              position: { x: pos.x, y: pos.y, z: pos.z },
+              rotation: { x: rot.x, y: rot.y, z: rot.z, w: rot.w },
+              brushColor: brushColor ?? next[myId].brushColor,
+            };
+          }
+          return { players: next };
+        });
+      }
     }
   }
 }));

@@ -26,6 +26,7 @@ export default function App() {
   const roomId = useGameStore((state) => state.roomId);
   const roomStatus = useGameStore((state) => state.roomStatus);
   const sensitivity = useGameStore((state) => state.sensitivity);
+  const isHunter = useGameStore((state) => state.myId ? state.players[state.myId]?.role === 'hunter' : false);
 
   const isPlaying = roomStatus === "playing" && roomId !== null;
 
@@ -42,7 +43,7 @@ export default function App() {
   return (
     <div className="w-full h-screen bg-black">
       {/* Reticle */}
-      {isPlaying && isLocked && (
+      {isPlaying && isLocked && isHunter && (
         <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
           <div className="w-1.5 h-1.5 bg-white rounded-full opacity-80" />
         </div>

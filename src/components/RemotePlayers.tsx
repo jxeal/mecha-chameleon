@@ -1,5 +1,5 @@
 import { useGameStore } from '../store';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { RemotePlayer } from '../store';
 
@@ -19,7 +19,41 @@ export function RemotePlayers() {
 
 function OtherPlayer({ player }: { player: RemotePlayer }) {
   const groupRef = useRef<THREE.Group>(null);
-  const weaponRef = useRef<THREE.Group>(null);
+
+  // Initialize canvas and texture
+  const { canvas, texture } = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#4287f5'; // Default blue color
+      ctx.fillRect(0, 0, 256, 256);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return { canvas, texture };
+  }, []);
+
+  // Listen to remote paint events
+  useEffect(() => {
+    const handlePaint = (e: Event) => {
+      const { u, v, color } = (e as CustomEvent).detail;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(u * 256, (1 - v) * 256, 12, 0, Math.PI * 2);
+        ctx.fill();
+        texture.needsUpdate = true;
+      }
+    };
+
+    window.addEventListener(`player-paint-${player.id}`, handlePaint);
+    return () => {
+      window.removeEventListener(`player-paint-${player.id}`, handlePaint);
+    };
+  }, [player.id, canvas, texture]);
 
   useEffect(() => {
     if (groupRef.current) {
@@ -41,7 +75,11 @@ function OtherPlayer({ player }: { player: RemotePlayer }) {
       {/* Body is lower than the camera */}
       <mesh position={[0, bodyY, 0]} castShadow>
         <capsuleGeometry args={capsuleArgs} />
-        <meshStandardMaterial color={isHunter ? "#f58742" : "#4287f5"} />
+        {isHunter ? (
+          <meshStandardMaterial color="#f58742" />
+        ) : (
+          <meshStandardMaterial map={texture} />
+        )}
       </mesh>
       {/* Head/Face is slightly forward */}
       <mesh position={[0, 0, -0.1]} castShadow>
@@ -49,17 +87,37 @@ function OtherPlayer({ player }: { player: RemotePlayer }) {
         <meshStandardMaterial color="#ffcc99" />
       </mesh>
 
-      {/* Weapon positioned relative to camera */}
-      <group position={[0.3, -0.3, -0.5]}>
-        <mesh position={[0, 0, 0]} castShadow>
-          <boxGeometry args={[0.08, 0.08, 0.4]} />
-          <meshStandardMaterial color="#444" />
-        </mesh>
-        <mesh position={[0, -0.1, 0.15]} castShadow>
-          <boxGeometry args={[0.06, 0.15, 0.08]} />
-          <meshStandardMaterial color="#222" />
-        </mesh>
-      </group>
+      {/* Weapon positioned relative to camera (Hunters only) or Paintbrush */}
+      {isHunter ? (
+        <group position={[0.3, -0.3, -0.5]}>
+          <mesh position={[0, 0, 0]} castShadow>
+            <boxGeometry args={[0.08, 0.08, 0.4]} />
+            <meshStandardMaterial color="#444" />
+          </mesh>
+          <mesh position={[0, -0.1, 0.15]} castShadow>
+            <boxGeometry args={[0.06, 0.15, 0.08]} />
+            <meshStandardMaterial color="#222" />
+          </mesh>
+        </group>
+      ) : (
+        <group position={[0.3, -0.4, -0.2]} rotation={[0.5, 0, 0]}>
+          {/* Handle */}
+          <mesh castShadow>
+            <cylinderGeometry args={[0.02, 0.02, 0.4, 8]} />
+            <meshStandardMaterial color="#8B5A2B" />
+          </mesh>
+          {/* Ferrule */}
+          <mesh position={[0, 0.2, 0]} castShadow>
+            <cylinderGeometry args={[0.025, 0.025, 0.05, 8]} />
+            <meshStandardMaterial color="#aaa" metalness={0.8} roughness={0.2} />
+          </mesh>
+          {/* Bristles tip */}
+          <mesh position={[0, 0.25, 0]} castShadow>
+            <coneGeometry args={[0.025, 0.08, 8]} />
+            <meshStandardMaterial color={player.brushColor ?? "#ff0000"} roughness={0.8} />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
