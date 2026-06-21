@@ -1,0 +1,6 @@
+{
+  "name": "Room Shooter 3D",
+  "description": "A simple 3D FPS game where you can move around a room and shoot a gun to leave temporary bullet marks on the walls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
